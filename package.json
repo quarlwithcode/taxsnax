@@ -1,0 +1,53 @@
+{
+  "name": "taxsnax",
+  "version": "0.1.0",
+  "description": "Bite-sized tax info from large data dumps. US tax preparation for CPAs.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "taxsnax": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/cli/index.ts",
+    "start": "node dist/cli/index.js",
+    "test": "vitest run",
+    "test:smoke": "vitest run test/smoke.test.ts",
+    "check:docs": "node scripts/check-docs.mjs",
+    "pack:check": "npm pack --dry-run",
+    "release:check": "npm run build && npm run test && npm run check:docs && npm run pack:check",
+    "prepublishOnly": "npm run release:check"
+  },
+  "keywords": [
+    "taxes",
+    "accounting",
+    "1099",
+    "expenses",
+    "cpa",
+    "irs",
+    "finance",
+    "business",
+    "cli"
+  ],
+  "author": "CubiCrew",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.0.0",
+    "csv-parse": "^5.5.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "SKILL.md",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ]
+}
