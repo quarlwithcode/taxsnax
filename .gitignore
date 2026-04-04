@@ -4,3 +4,37 @@ dist/
 *.db-journal
 .clawck/
 .env
+
+# TAXSNAX DATA ISOLATION
+# NEVER commit real financial data
+
+# Data files
+*.csv
+*.xlsx
+*.pdf
+*.qbo
+*.ofx
+*.taxsnax
+
+# Except test fixtures
+!test/fixtures/*.csv
+!test/fixtures/README.md
+
+# Local test runs
+test/data/*
+!test/data/.gitkeep
+
+# User data directories
+.taxsnax/
+~/.taxsnax/
+.data/
+sandbox/
+
+# Output files
+cpa-packet-*.txt
+1099-summary-*.txt
+tax-summary-*.json
+
+# OS files
+.DS_Store
+Thumbs.db
