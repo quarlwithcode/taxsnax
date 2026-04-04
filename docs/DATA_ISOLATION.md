@@ -136,12 +136,23 @@ taxsnax --dir ./data cpa-packet --output ~/Desktop/my-taxes-2025.txt
 npm run clean-data
 ```
 
-This script:
-1. Deletes all `.csv`, `.xlsx`, `.pdf` files
-2. Clears local test data
-3. Verifies no sensitive patterns in code
-4. Checks for SSN-like numbers
-5. Validates .gitignore is working
+This script performs **13 security checks**:
+
+1. **Data files** - No CSV/XLSX/PDF in repo
+2. **SSN patterns** - Social Security Numbers
+3. **EIN patterns** - Employer ID Numbers
+4. **Email addresses** - Personal emails
+5. **Phone numbers** - Contact numbers
+6. **Account numbers** - Credit cards, bank accounts
+7. **Street addresses** - Physical locations
+8. **Location data** - City/State/ZIP combos
+9. **IP addresses** - Network identifiers
+10. **API keys** - Authentication tokens
+11. **Passwords** - Credential patterns
+12. **Environment variables** - Hardcoded secrets
+13. **.gitignore** - Proper configuration
+
+**Any CRITICAL finding blocks the push.**
 
 ### Manual Verification
 
@@ -150,9 +161,12 @@ This script:
 git ls-files | grep -E '\.(csv|xlsx|pdf|json)$'
 # Should only show: test/fixtures/sample-*.csv
 
-# Check for data patterns
-grep -r "[0-9]{3}-[0-9]{2}-[0-9]{4}" src/  # SSN pattern
-grep -r "[0-9]{2}-[0-9]{7}" src/          # EIN pattern
+# Check for sensitive patterns
+grep -rE "[0-9]{3}-[0-9]{2}-[0-9]{4}" src/  # SSN
+grep -rE "[0-9]{2}-[0-9]{7}" src/          # EIN
+grep -rE "[a-z]+@[a-z]+\.[a-z]+" src/      # Emails
+grep -rE "[0-9]{4}[ -][0-9]{4}[ -][0-9]{4}[ -][0-9]{4}" src/  # Credit cards
+grep -rE "[0-9]+ [A-Za-z]+ (St|Ave|Rd)" src/  # Addresses
 
 # Should return NOTHING
 ```
