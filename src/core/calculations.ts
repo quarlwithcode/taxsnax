@@ -4,10 +4,13 @@ import { detectDuplicates, formatCurrency } from './utils.js';
 
 export async function calculateSummary(db: TaxDatabase, taxYear: number): Promise<TaxSummary> {
   const transactions = await db.getAllTransactions();
-  
-  // Filter to tax year
+
+  // Filter to tax year - handle both ISO and YYYY-MM-DD formats
   const yearTxs = transactions.filter(tx => {
-    const txYear = new Date(tx.date).getFullYear();
+    const dateStr = tx.date;
+    // Extract year from YYYY-MM-DD or ISO format
+    const yearMatch = dateStr.match(/^(\d{4})/);
+    const txYear = yearMatch ? parseInt(yearMatch[1]) : new Date(dateStr).getFullYear();
     return txYear === taxYear;
   });
   

@@ -5,3 +5,6 @@ export * from './utils.js';
 export * from './database.js';
 export * from './importers.js';
 export * from './calculations.js';
+export * from './categorization.js';
+export * from './contractors.js';
+export * from './tax-estimation.js';

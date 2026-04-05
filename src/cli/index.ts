@@ -4,8 +4,12 @@ import { readFile, writeFile } from 'fs/promises';
 import { APP_VERSION } from '../core/types.js';
 import { resolveDataDir } from '../core/config.js';
 import { TaxDatabase } from '../core/database.js';
-import { importCSV, importXLSX, importPDF } from '../core/importers.js';
+import { importCSV, importXLSX, importPDF, importQBO, importOFX } from '../core/importers.js';
 import { calculateSummary, identifyContractors, generateCPAPacket, generate1099Summary } from '../core/calculations.js';
+import { CategorizationEngine } from '../core/categorization.js';
+import { generate1099Checklist, generateContractorReport, generateW9RequestEmail, consolidateContractorPayments, calculatePaymentHistory } from '../core/contractors.js';
+import { generateTaxEstimate, generateTaxEstimateReport, calculateQuarterlyEstimate } from '../core/tax-estimation.js';
+import { detectFileType, groupByCategory, groupByMonth, formatCurrency } from '../core/utils.js';
 
 const program = new Command();
 
@@ -72,8 +76,14 @@ program
         case 'pdf':
           result = await importPDF(file, options.source);
           break;
+        case 'qbo':
+          result = await importQBO(file, options.source);
+          break;
+        case 'ofx':
+          result = await importOFX(file, options.source);
+          break;
         default:
-          fail('UNKNOWN_FORMAT', `Unsupported format: ${format}. Use CSV.`);
+          fail('UNKNOWN_FORMAT', `Unsupported format: ${format}. Use CSV, XLSX, PDF, QBO, or OFX.`);
       }
     } catch (e: any) {
       fail('IMPORT_ERROR', e.message);
@@ -282,6 +292,280 @@ program
     console.log(`     Personal info: ${result.personalInfo ? '✓' : '✗'}`);
     console.log(`     Summary: ${result.summary ? '✓' : '✗'}`);
     console.log('');
+  });
+
+// v0.1.1 Commands
+
+program
+  .command('1099-checklist')
+  .description('Generate 1099-NEC checklist for contractors')
+  .option('-o, --output <file>', 'Save to file')
+  .action(async (options) => {
+    const dataDir = resolveDataDir(program.opts().dir);
+    const db = new TaxDatabase(dataDir);
+    
+    const contractors = await db.getAllContractors();
+    const checklist = generate1099Checklist(contractors);
+    
+    if (options.output) {
+      await writeFile(options.output, checklist, 'utf8');
+    }
+    
+    if (program.opts().json) {
+      return out({ contractors: contractors.filter(c => c.needs1099) });
+    }
+    
+    console.log(checklist);
+    if (options.output) {
+      console.log(`\n  ✅ 1099 checklist saved to: ${options.output}\n`);
+    }
+  });
+
+program
+  .command('contractor-report')
+  .description('Generate detailed report for a specific contractor')
+  .requiredOption('-n, --name <name>', 'Contractor name')
+  .option('-o, --output <file>', 'Save to file')
+  .action(async (options) => {
+    const dataDir = resolveDataDir(program.opts().dir);
+    const db = new TaxDatabase(dataDir);
+    
+    const contractors = await db.getAllContractors();
+    const contractor = contractors.find(c => 
+      c.name.toLowerCase() === options.name.toLowerCase()
+    );
+    
+    if (!contractor) {
+      fail('NOT_FOUND', `Contractor "${options.name}" not found`);
+    }
+    
+    const transactions = await db.getAllTransactions();
+    const history = calculatePaymentHistory(contractor, transactions);
+    const report = generateContractorReport(contractor, history);
+    
+    if (options.output) {
+      await writeFile(options.output, report, 'utf8');
+    }
+    
+    if (program.opts().json) {
+      return out({ contractor, history });
+    }
+    
+    console.log(report);
+  });
+
+program
+  .command('w9-request')
+  .description('Generate W-9 request email for a contractor')
+  .requiredOption('-n, --name <name>', 'Contractor name')
+  .action(async (options) => {
+    const dataDir = resolveDataDir(program.opts().dir);
+    const db = new TaxDatabase(dataDir);
+    
+    const contractors = await db.getAllContractors();
+    const contractor = contractors.find(c => 
+      c.name.toLowerCase() === options.name.toLowerCase()
+    );
+    
+    if (!contractor) {
+      fail('NOT_FOUND', `Contractor "${options.name}" not found`);
+    }
+    
+    const email = generateW9RequestEmail(contractor);
+    
+    if (program.opts().json) {
+      return out({ email, contractor });
+    }
+    
+    console.log('\n' + '='.repeat(60));
+    console.log('W-9 REQUEST EMAIL');
+    console.log('='.repeat(60) + '\n');
+    console.log(email);
+    console.log('\n' + '='.repeat(60));
+  });
+
+program
+  .command('tax-estimate')
+  .description('Estimate federal, state, and local taxes')
+  .option('-y, --year <year>', 'Tax year', '2025')
+  .option('--state <state>', 'State code (e.g., PA, CA, NY)', 'PA')
+  .option('--city <city>', 'City for local tax estimate')
+  .option('-o, --output <file>', 'Save to file')
+  .action(async (options) => {
+    const dataDir = resolveDataDir(program.opts().dir);
+    const db = new TaxDatabase(dataDir);
+    
+    const summary = await calculateSummary(db, parseInt(options.year));
+    const personal = await db.getPersonalInfo();
+    
+    if (!personal) {
+      fail('MISSING_INFO', 'Personal info required. Run: taxsnax personal --help');
+    }
+    
+    const estimate = generateTaxEstimate(summary, personal, options.state, options.city);
+    const report = generateTaxEstimateReport(estimate, summary, personal);
+    
+    if (options.output) {
+      await writeFile(options.output, report, 'utf8');
+    }
+    
+    if (program.opts().json) {
+      return out({ estimate, summary });
+    }
+    
+    console.log(report);
+    if (options.output) {
+      console.log(`\n  ✅ Tax estimate saved to: ${options.output}\n`);
+    }
+  });
+
+program
+  .command('quarterly-estimate')
+  .description('Calculate quarterly estimated tax payment')
+  .requiredOption('-q, --quarter <n>', 'Quarter (1-4)')
+  .requiredOption('-i, --income <amount>', 'YTD income')
+  .option('--state <state>', 'State code', 'PA')
+  .action(async (options) => {
+    const dataDir = resolveDataDir(program.opts().dir);
+    const db = new TaxDatabase(dataDir);
+    const personal = await db.getPersonalInfo();
+    
+    if (!personal) {
+      fail('MISSING_INFO', 'Personal info required. Run: taxsnax personal --help');
+    }
+    
+    const result = calculateQuarterlyEstimate(
+      parseFloat(options.income),
+      parseInt(options.quarter),
+      personal.filingStatus,
+      options.state
+    );
+    
+    if (program.opts().json) {
+      return out({ 
+        quarter: options.quarter,
+        payment: result.payment,
+        explanation: result.explanation 
+      });
+    }
+    
+    console.log(`\n  💰 Q${options.quarter} Estimated Payment: ${formatCurrency(result.payment)}`);
+    console.log(`\n  ${result.explanation}\n`);
+  });
+
+program
+  .command('reports')
+  .description('Generate all tax reports')
+  .option('-y, --year <year>', 'Tax year', '2025')
+  .option('-o, --output-dir <dir>', 'Output directory', './reports')
+  .action(async (options) => {
+    const dataDir = resolveDataDir(program.opts().dir);
+    const db = new TaxDatabase(dataDir);
+    const year = parseInt(options.year);
+    
+    // Generate all reports
+    const summary = await calculateSummary(db, year);
+    const contractors = await db.getAllContractors();
+    const personal = await db.getPersonalInfo();
+    
+    const reports: string[] = [];
+    
+    // 1. Summary Report
+    const summaryReport = generateCPAPacket(summary);
+    reports.push('summary.txt');
+    await writeFile(`${options.outputDir}/summary.txt`, summaryReport, 'utf8').catch(() => {});
+    
+    // 2. 1099 Checklist
+    const checklist1099 = generate1099Checklist(contractors);
+    reports.push('1099-checklist.txt');
+    await writeFile(`${options.outputDir}/1099-checklist.txt`, checklist1099, 'utf8').catch(() => {});
+    
+    // 3. Tax Estimate (if personal info available)
+    if (personal) {
+      const estimate = generateTaxEstimate(summary, personal, 'PA');
+      const estimateReport = generateTaxEstimateReport(estimate, summary, personal);
+      reports.push('tax-estimate.txt');
+      await writeFile(`${options.outputDir}/tax-estimate.txt`, estimateReport, 'utf8').catch(() => {});
+    }
+    
+    // 4. Contractor Reports
+    const transactions = await db.getAllTransactions();
+    for (const contractor of contractors.filter(c => c.needs1099)) {
+      const history = calculatePaymentHistory(contractor, transactions);
+      const report = generateContractorReport(contractor, history);
+      const safeName = contractor.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      reports.push(`contractor-${safeName}.txt`);
+      await writeFile(`${options.outputDir}/contractor-${safeName}.txt`, report, 'utf8').catch(() => {});
+    }
+    
+    if (program.opts().json) {
+      return out({ reports, outputDir: options.outputDir });
+    }
+    
+    console.log(`\n  📊 Generated ${reports.length} reports in ${options.outputDir}/`);
+    console.log('');
+    for (const r of reports) {
+      console.log(`     • ${r}`);
+    }
+    console.log('');
+  });
+
+program
+  .command('categorize')
+  .description('Re-categorize transactions using ML engine')
+  .option('-y, --year <year>', 'Tax year', '2025')
+  .action(async (options) => {
+    const dataDir = resolveDataDir(program.opts().dir);
+    const db = new TaxDatabase(dataDir);
+    
+    const transactions = await db.getAllTransactions();
+    const engine = new CategorizationEngine();
+    
+    let updated = 0;
+    for (const tx of transactions) {
+      if (!tx.category || tx.category === 'Other') {
+        const result = engine.categorize(tx.description, tx.amount);
+        tx.category = result.category;
+        await db.saveTransaction(tx);
+        updated++;
+      }
+    }
+    
+    if (program.opts().json) {
+      return out({ updated, total: transactions.length });
+    }
+    
+    console.log(`\n  ✅ Categorized ${updated} transactions\n`);
+  });
+
+program
+  .command('recurring')
+  .description('Detect recurring expenses')
+  .option('-y, --year <year>', 'Tax year', '2025')
+  .action(async (options) => {
+    const dataDir = resolveDataDir(program.opts().dir);
+    const db = new TaxDatabase(dataDir);
+    
+    const transactions = await db.getAllTransactions();
+    const engine = new CategorizationEngine();
+    const patterns = engine.detectRecurring(transactions);
+    
+    if (program.opts().json) {
+      return out({ patterns });
+    }
+    
+    console.log('\n  🔄 Recurring Expenses Detected:\n');
+    if (patterns.length === 0) {
+      console.log('     No recurring patterns found.\n');
+    } else {
+      for (const p of patterns) {
+        console.log(`     ${p.description}`);
+        console.log(`       Amount: ${formatCurrency(p.amount)}`);
+        console.log(`       Frequency: ${p.frequency}`);
+        console.log(`       Last seen: ${p.lastDate}`);
+        console.log('');
+      }
+    }
   });
 
 program.parse();

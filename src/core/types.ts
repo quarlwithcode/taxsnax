@@ -93,4 +93,4 @@ export const ImportFormatSchema = z.enum(['csv', 'xlsx', 'pdf', 'qbo', 'ofx']);
 export type ImportFormat = z.infer<typeof ImportFormatSchema>;
 
 // App version
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.1.1';
