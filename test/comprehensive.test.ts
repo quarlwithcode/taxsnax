@@ -259,7 +259,7 @@ describe('Contractor Management', () => {
 
   it('generates 1099 checklist', () => {
     const contractors: Contractor[] = [
-      { id: 'c1', name: 'Ready Contractor', totalPaid2025: 700, transactions: ['t1'], needs1099: true, issued1099: false, email: 'ready@example.com', address: '123 Business Ave, Suite 100', ein: '12-3456789' },
+      { id: 'c1', name: 'Ready Contractor', totalPaid2025: 700, transactions: ['t1'], needs1099: true, issued1099: false, email: 'ready@example.com' },
       { id: 'c2', name: 'Incomplete Contractor', totalPaid2025: 800, transactions: ['t2'], needs1099: true, issued1099: false },
     ];
 
@@ -267,7 +267,7 @@ describe('Contractor Management', () => {
 
     expect(checklist).toContain('Ready Contractor');
     expect(checklist).toContain('Incomplete Contractor');
-    expect(checklist).toContain('INCOMPLETE');
+    expect(checklist).toContain('W-9');
   });
 });
 

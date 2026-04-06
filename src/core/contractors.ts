@@ -26,23 +26,19 @@ export function calculate1099Threshold(contractor: Contractor): boolean {
 
 export function getMissing1099Info(contractor: Contractor): string[] {
   const missing: string[] = [];
-  
+
   if (!contractor.name || contractor.name === 'Unknown') {
     missing.push('Legal name');
   }
-  
-  if (!contractor.address) {
-    missing.push('Mailing address');
-  }
-  
+
   if (!contractor.email) {
     missing.push('Email address (recommended)');
   }
-  
-  if (!contractor.ssn && !contractor.ein) {
-    missing.push('SSN or EIN (from W-9)');
-  }
-  
+
+  // Note: SSN/EIN are NOT stored in TaxSnax
+  // Collect via W-9 forms and manage securely outside this tool
+  missing.push('W-9 form with SSN/EIN (collect separately)');
+
   return missing;
 }
 
@@ -81,7 +77,7 @@ export function generate1099Checklist(contractors: Contractor[]): string {
       for (const c of ready) {
         lines.push(`   ${c.name}`);
         lines.push(`      Amount: ${formatCurrency(c.totalPaid2025)}`);
-        lines.push(`      TIN: ${c.ein ? 'EIN ' + c.ein : 'SSN on file'}`);
+        lines.push(`      TIN: Have W-9 on file`);
         lines.push('');
       }
     }
@@ -200,14 +196,16 @@ export function calculatePaymentHistory(
 
 export function generateContractorReport(contractor: Contractor, history: PaymentHistory): string {
   const lines: string[] = [];
-  
+
   lines.push('═══════════════════════════════════════════════════════════════');
   lines.push('                    CONTRACTOR REPORT');
   lines.push('═══════════════════════════════════════════════════════════════');
   lines.push('');
   lines.push(`Contractor: ${contractor.name}`);
   if (contractor.email) lines.push(`Email: ${contractor.email}`);
-  if (contractor.address) lines.push(`Address: ${contractor.address}`);
+  lines.push('');
+  lines.push('NOTE: SSN/EIN are not stored in TaxSnax. Collect via W-9 forms');
+  lines.push('      and store securely outside this tool.');
   lines.push('');
   lines.push('PAYMENT SUMMARY - 2025');
   lines.push(`  Q1 (Jan-Mar):  ${formatCurrency(history.quarters.q1).padStart(12)}`);

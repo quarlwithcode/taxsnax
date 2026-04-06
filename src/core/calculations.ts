@@ -167,13 +167,13 @@ export function generate1099Summary(contractors: Contractor[]): string {
       lines.push(`   Name:     ${c.name}`);
       lines.push(`   Amount:   ${formatCurrency(c.totalPaid2025)}`);
       lines.push(`   Email:    ${c.email || 'NEEDED'}`);
-      lines.push(`   Address:  ${c.address || 'NEEDED'}`);
-      lines.push(`   SSN/EIN:  ${c.ssn || c.ein || 'NEEDED'}`);
+      lines.push(`   W-9:      Collect SSN/EIN via W-9 form`);
       lines.push('');
     }
-    
+
     lines.push('⚠️  ACTION REQUIRED:');
-    lines.push('   Collect missing information for W-9s');
+    lines.push('   Collect W-9 forms from contractors');
+    lines.push('   Store W-9s securely (SSN/EIN not stored in TaxSnax)');
     lines.push('   Issue 1099-NEC forms by January 31, 2026');
   }
   

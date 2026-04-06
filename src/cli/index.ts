@@ -151,49 +151,47 @@ program
 
 program
   .command('business')
-  .description('Set business information')
+  .description('Set business information (EIN not stored - keep secure records separately)')
   .requiredOption('-n, --name <name>', 'Business name')
   .requiredOption('-t, --type <type>', 'Business type (sole-proprietorship, llc, s-corp, c-corp, partnership)')
-  .option('-e, --ein <ein>', 'EIN')
   .option('-a, --address <address>', 'Business address')
   .action(async (options) => {
     const dataDir = resolveDataDir(program.opts().dir);
     const db = new TaxDatabase(dataDir);
-    
+
     await db.saveBusinessInfo({
       name: options.name,
       businessType: options.type,
-      ein: options.ein,
       address: options.address || '',
       taxYear: new Date().getFullYear(),
     });
-    
+
     if (program.opts().json) return out({ saved: true });
-    console.log(`\n  ✅ Business info saved\n`);
+    console.log(`\n  ✅ Business info saved`);
+    console.log(`     Note: EIN is not stored in TaxSnax. Keep secure records separately.\n`);
   });
 
 program
   .command('personal')
-  .description('Set personal information')
+  .description('Set personal information (SSN not stored - keep secure records separately)')
   .requiredOption('-n, --name <name>', 'Your name')
-  .requiredOption('-s, --ssn <ssn>', 'SSN')
   .requiredOption('-a, --address <address>', 'Home address')
   .requiredOption('--status <status>', 'Filing status (single, married-joint, married-separate, head-household)')
   .option('--dependents <n>', 'Number of dependents', '0')
   .action(async (options) => {
     const dataDir = resolveDataDir(program.opts().dir);
     const db = new TaxDatabase(dataDir);
-    
+
     await db.savePersonalInfo({
       name: options.name,
-      ssn: options.ssn,
       address: options.address,
       filingStatus: options.status,
       dependents: parseInt(options.dependents),
     });
-    
+
     if (program.opts().json) return out({ saved: true });
-    console.log(`\n  ✅ Personal info saved\n`);
+    console.log(`\n  ✅ Personal info saved`);
+    console.log(`     Note: SSN is not stored in TaxSnax. Keep secure records separately.\n`);
   });
 
 program
@@ -220,19 +218,19 @@ program
     if (personal) {
       lines.push('👤 TAXPAYER INFORMATION');
       lines.push(`   Name: ${personal.name}`);
-      lines.push(`   SSN: ${personal.ssn}`);
       lines.push(`   Address: ${personal.address}`);
       lines.push(`   Filing Status: ${personal.filingStatus}`);
       lines.push(`   Dependents: ${personal.dependents}`);
+      lines.push('   ⚠️  SSN: [Provide separately to your CPA]');
       lines.push('');
     }
-    
+
     if (business) {
       lines.push('🏢 BUSINESS INFORMATION');
       lines.push(`   Business Name: ${business.name}`);
       lines.push(`   Business Type: ${business.businessType}`);
-      if (business.ein) lines.push(`   EIN: ${business.ein}`);
       if (business.address) lines.push(`   Address: ${business.address}`);
+      lines.push('   ⚠️  EIN: [Provide separately to your CPA]');
       lines.push('');
     }
     

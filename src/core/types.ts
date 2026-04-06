@@ -17,17 +17,16 @@ export const TransactionSchema = z.object({
 export type Transaction = z.infer<typeof TransactionSchema>;
 
 // 1099 Contractor tracking
+// Note: SSN/EIN are NOT stored - collect via W-9 forms separately
 export const ContractorSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string().email().optional(),
-  address: z.string().optional(),
-  ssn: z.string().optional(), // Last 4 only for privacy
-  ein: z.string().optional(),
   totalPaid2025: z.number().default(0),
   transactions: z.array(z.string()), // Transaction IDs
   needs1099: z.boolean().default(false),
   issued1099: z.boolean().default(false),
+  // SSN/EIN are intentionally excluded - manage via W-9 forms, not this tool
 });
 export type Contractor = z.infer<typeof ContractorSchema>;
 
@@ -56,22 +55,24 @@ export const EXPENSE_CATEGORIES = [
 ] as const;
 
 // Business info
+// Note: EIN is NOT stored - keep secure records separately
 export const BusinessInfoSchema = z.object({
   name: z.string(),
-  ein: z.string().optional(),
   address: z.string(),
   businessType: z.enum(['sole-proprietorship', 'llc', 's-corp', 'c-corp', 'partnership']),
   taxYear: z.number().default(2025),
+  // EIN is intentionally excluded - manage securely outside this tool
 });
 export type BusinessInfo = z.infer<typeof BusinessInfoSchema>;
 
 // Personal info
+// Note: SSN is NOT stored - keep secure records separately
 export const PersonalInfoSchema = z.object({
   name: z.string(),
-  ssn: z.string(),
   address: z.string(),
   filingStatus: z.enum(['single', 'married-joint', 'married-separate', 'head-household']),
   dependents: z.number().default(0),
+  // SSN is intentionally excluded - manage securely outside this tool
 });
 export type PersonalInfo = z.infer<typeof PersonalInfoSchema>;
 
